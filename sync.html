@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Synchronization</title>
+    <link type="text/css" rel="stylesheet" href="libs/ui-lightness/jquery-ui-1.8.17.custom.css" />
+    <script type="text/javascript" src="libs/jquery-1.6.2.min.js"></script>
+    <script type="text/javascript">
+        var wavelength = 600;
+        var dancers = [
+            {
+                size: [300, 225],
+                numFrames: 9,
+                points: [0.705],
+                url: 'out/partyhard.png'
+            },
+            {
+                size: [192, 146],
+                numFrames: 26,
+                points: [0.46,13.76],
+                url: 'out/colbert.png'
+            },
+            {
+                size: [257, 231],
+                numFrames: 49,
+                points: [1.16,28.19],
+                url: 'out/Pendulum_animation.png'
+            },
+            {
+                size: [345, 259],
+                numFrames: 10,
+                points: [4.01,8.7825],
+                url: 'out/lisasimpson.png'
+            },
+            {
+                size: [500, 400],
+                numFrames: 14,
+                points: [5.54,12.48],
+                url: 'out/willsmith.png'
+            },
+            {
+                size: [240, 192],
+                numFrames: 20,
+                points: [1.36,7.75,15.33],
+                url: 'out/bradpitt.png'
+            },
+            {
+                size: [500, 500],
+                numFrames: 10,
+                points: [2.47,7.7524999999999995],
+                url: 'out/gary_oh_yeah.png'
+            }
+        ];
+
+        var t0;
+        $(document).ready(function() {
+            var loading = dancers.length;
+            dancers.forEach(function(d) {
+                var img = $("<img />")
+                    .attr('src', d.url)
+                    .load(function() {
+                        if (!this.complete || typeof this.naturalWidth == "undefined" || this.naturalWidth == 0) {
+                            alert('broken image!');
+                        } else if (--loading <= 0) { // All loaded.
+                            dancers.forEach(function(d) {
+                                d.elem = $('<div/>')
+                                    .css('background-image', 'url(' + d.url + ')')
+                                    .css('float', 'left')
+                                    .width(d.size[0])
+                                    .height(d.size[1])
+                                    .appendTo('body');
+                            });
+                            
+                            t0 = (new Date()).getTime();
+                            setInterval(function() {
+                                var dt = ((new Date()).getTime() - t0);
+                                dancers.forEach(function(d, i) {
+                                    // Figure out which frame to display based on the animation's
+                                    // FPS and make sure the first peak/point occurs at t=0.
+                                    var duration = wavelength * d.points.length;
+                                    var frame = Math.floor((dt + d.points[0] * duration / d.numFrames) % duration * d.numFrames / duration);
+                                    d.elem.css('background-position', '0 ' + (-d.size[1] * frame) + 'px')
+                                });
+                            }, 50);
+                        }
+                    });
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <p>Original GIFs from <a href="http://localhost/2012/dmclaren/dancepartysync/sync.html" target="_blank">Tumblr</a></p>
+</body>
+
+</html>

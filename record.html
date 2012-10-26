@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Record Dance Moves</title>
+    <link type="text/css" rel="stylesheet" href="libs/ui-lightness/jquery-ui-1.8.17.custom.css" />
+    <script type="text/javascript" src="libs/jquery-1.6.2.min.js"></script>
+    <script type="text/javascript">
+        var urlParams = {};
+        (function () {
+            var match,
+                pl     = /\+/g,  // Regex for replacing addition symbol with a space
+                search = /([^&=]+)=?([^&]*)/g,
+                decode = function (s) { return decodeURIComponent(s.replace(pl, " ")); },
+                query  = window.location.search.substring(1);
+
+            while (match = search.exec(query))
+               urlParams[decode(match[1])] = decode(match[2]);
+        })();
+
+        var width = urlParams['width'];
+        var height = urlParams['height'];
+        var frames = urlParams['frames'];
+        var image = urlParams['image'];
+
+        // FIXME: Might be prudent to ignore the first few clicks until the user gets into the beat.
+
+        ///
+        // A k-nearest neighbors algorithm which uses the first k non-similar hits
+        // to determine the number of bins and then adds remaining hits to each bin
+        // to refine the centroid further.
+        // 
+        // This algorithm's weakness is in the first k hits. If these values aren't
+        // representative of the actual signal then we're screwed.
+        //
+        var recorder = (function(numFrames) {
+            return {
+                // Each element is an array of hits in the same bucket.
+                bins: [],
+
+                // Indicates whether we're currently guessing the first k hits.
+                guessing: true,
+
+                // The read index.
+                index: 0,
+
+                // The delta between the first and second readings.
+                firstDelta: null,
+
+                read: function(hit) {
+                    if (this.index == 0) this.bins.push([hit]);
+                    else if (this.index == 1) {
+                        this.firstDelta = Math.abs(hit - this.bins[this.bins.length - 1]);
+                        if (this.firstDelta > numFrames/2) this.firstDelta = numFrames - this.firstDelta; // Edge case.
+
+                        this.bins.push([hit]);
+                    }
+                    else if (this.guessing) {
+                        // Start off by guessing the categories.
+                        var lowestDelta = this.bins
+                            .map(function(d) {
+                                var v = Math.abs(d[0] - hit);
+                                return v < numFrames/2 ? v : numFrames - v;
+                            })
+                            .reduce(function(a, b) { return a < b ? a : b; });
+
+                        if (lowestDelta < this.firstDelta / 2) {
+                            // This hit was too close to another hit so we'll treat it
+                            // as part of the same cluster.
+                            this.guessing = false;
+                        }
+                        else {
+                            this.bins.push([hit]);
+                        }
+                    }
+                    else {
+                        // Finished guessing phase. Now slot new hits into most similar bin.
+                        var deltas = this.getCenters().map(function(d) {
+                            var v = Math.abs(d - hit);
+                            return v < numFrames/2 ? v : numFrames - v;
+                        });
+                        var lowestDelta = deltas.reduce(function(a,b) { return a < b ? a : b; });
+
+                        this.bins[deltas.indexOf(lowestDelta)].push(hit);
+                    }
+                    this.index++;
+                },
+
+                getCenters: function() {
+                    return this.bins.map(function(d) {
+                        return d.reduce(function(a,b) { return a + b; }) / d.length; });
+                }
+            };
+        })(frames);
+
+        $(document).ready(function() {
+            var currFrame = 0;
+            var fps = 5;
+
+            $('#content')
+                .width(width)
+                .height(height);
+
+            var img = $("<img />").attr('src', image)
+                .load(function() {
+                    if (!this.complete || typeof this.naturalWidth == "undefined" || this.naturalWidth == 0) {
+                        alert('broken image!');
+                    } else {
+                        $("#content").css('background-image', 'url(' + image + ')');
+
+                        startTime = (new Date()).getTime();
+                        setInterval(function() {
+                            $('#content').css('background-position', '0 ' + (-height * currFrame++) + 'px');
+                            if (currFrame >= frames) {
+                                currFrame = 0;
+                                startTime = (new Date()).getTime();
+                            }
+                        }, 1000 / fps);
+                    }
+                });
+
+            $('#recordButton').click(function() {
+                recorder.read(((new Date()).getTime() - startTime) * fps / 1000);
+
+                var centers = recorder.getCenters();
+                centers.sort(function(a,b) { return a < b ? -1 : b < a ? 1 : 0; });
+                $('#output').val("{\n\tsize: [" + width + ", " + height + "],\n\tnumFrames: " + frames + ",\n\tpoints: [" + centers.join(',') + "],\n\turl: '" + image + "'\n},");
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <div id="content" style="float:left"></div>
+    <fieldset style="float:left">
+        <button id="recordButton">Record</button>
+    </fieldset>
+    <fieldset style="width:100%">
+        <textarea id="output" style="height:200px;width:100%"></textarea>
+    </fieldset>
+</body>
+
+</html>

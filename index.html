@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gary Oldman Test</title>
+    <link type="text/css" rel="stylesheet" href="libs/ui-lightness/jquery-ui-1.8.17.custom.css" />
+    <script type="text/javascript" src="libs/jquery-1.6.2.min.js"></script>
+    <script type="text/javascript">
+        var oldman = [2.2975000000000003, 7.426250000000001];
+        var smith = [5.133333333333334, 11.97090909090909];
+
+        var numFrames = 20;
+
+        // FIXME: Might be prudent to ignore the first few clicks until the user gets into the beat.
+
+        ///
+        // A k-nearest neighbors algorithm which uses the first k non-similar hits
+        // to determine the number of bins and then adds remaining hits to each bin
+        // to refine the centroid further.
+        // 
+        // This algorithm's weakness is in the first k hits. If these values aren't
+        // representative of the actual signal then we're screwed.
+        //
+        var carey = (function(numFrames) {
+            return {
+                // Each element is an array of hits in the same bucket.
+                bins: [],
+
+                // Indicates whether we're currently guessing the first k hits.
+                guessing: true,
+
+                // The read index.
+                index: 0,
+
+                // The delta between the first and second readings.
+                firstDelta: null,
+
+                read: function(hit) {
+                    if (this.index == 0) this.bins.push([hit]);
+                    else if (this.index == 1) {
+                        this.firstDelta = hit - this.bins[this.bins.length - 1];
+                        if (this.firstDelta < 0) this.firstDelta += numFrames; // Edge case.
+
+                        this.bins.push([hit]);
+                    }
+                    else if (this.guessing) {
+                        // Start off by guessing the categories.
+                        var lowestDelta = this.bins
+                            .map(function(d) {
+                                var v = Math.abs(d[0] - hit);
+                                return v < numFrames/2 ? v : numFrames - v;
+                            })
+                            .reduce(function(a, b) { return a < b ? a : b; });
+
+                        if (lowestDelta < this.firstDelta / 2) {
+                            // This hit was too close to another hit so we'll treat it
+                            // as part of the same cluster.
+                            this.guessing = false;
+                        }
+                        else {
+                            this.bins.push([hit]);
+                        }
+                    }
+                    else {
+                        // Finished guessing phase. Now slot new hits into most similar bin.
+                        var deltas = this.getCenters().map(function(d) {
+                            var v = Math.abs(d - hit);
+                            return v < numFrames/2 ? v : numFrames - v;
+                        });
+                        var lowestDelta = deltas.reduce(function(a,b) { return a < b ? a : b; });
+
+                        this.bins[deltas.indexOf(lowestDelta)].push(hit);
+                    }
+                    this.index++;
+                },
+
+                getCenters: function() {
+                    return this.bins.map(function(d) {
+                        return d.reduce(function(a,b) { return a + b; }) / d.length; });
+                }
+            };
+        })(numFrames);
+
+        $(document).ready(function() {
+            var frameHeight = 192;
+            var currFrame = 0;
+            var fps = 10;
+
+            var img = $("<img />").attr('src', 'bradpittout.png')
+                .load(function() {
+                    if (!this.complete || typeof this.naturalWidth == "undefined" || this.naturalWidth == 0) {
+                        alert('broken image!');
+                    } else {
+                        $("#content").css('background-image', 'url(bradpittout.png)');
+
+                        startTime = (new Date()).getTime();
+                        setInterval(function() {
+                            $('#content').css('background-position', '0 ' + (-frameHeight * currFrame++) + 'px');
+                            if (currFrame >= numFrames) {
+                                currFrame = 0;
+                                startTime = (new Date()).getTime();
+                            }
+                        }, 1000 / fps);
+                    }
+                });
+
+            $('#recordButton').click(function() {
+                carey.read(((new Date()).getTime() - startTime) * fps / 1000);
+
+                var centers = carey.getCenters();
+                centers.sort(function(a,b) { return a < b ? -1 : b < a ? 1 : 0; });
+                console.log('centers', centers);
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <div id="content" style="float:left;height:192px;width:240px;"></div>
+    <fieldset style="float:left">
+        <button id="recordButton">Record</button>
+        <button id="syncButton">Sync</button>
+    </fieldset>
+    <fieldset style="width:100%">
+        <textarea id="output" style="height:200px;width:100%"></textarea>
+    </fieldset>
+</body>
+
+</html>
