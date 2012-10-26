@@ -1,7 +1,7 @@
 Dance Party Synchronization
 ---------------------------
 
-Open sync.html to see the resulting dance party.
+Open [sync.html](http://demo.danielmclaren.com/2012/dancepartysync/sync.html) to see the resulting dance party.
 
 Grabbed a few animated GIFs tagged "dance party" plus some pendulums from Wikipedia. The beat of each GIF was recorded and synchronized with other GIFs so it would look like a proper dance party instead of dancing extras on a set. This turned out to be harder than I thought.
 
